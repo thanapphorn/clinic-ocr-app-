@@ -100,3 +100,9 @@ if rows:
         st.success(f"✅ Saved {len(rows)} rows to Google Sheet!")
 else:
     st.caption("Upload PDF files to start…")
+
+st.markdown(
+    f'🔗 **Sheet in use:** https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit',
+    unsafe_allow_html=True
+)
+
