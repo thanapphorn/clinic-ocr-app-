@@ -114,3 +114,16 @@ if SHEET_ID and st.button("🧪 Test write & read back"):
     st.write("Last 5 rows from Google Sheet:")
     st.table(values[-5:])
 
+if rows:
+    df = pd.DataFrame(rows, columns=["LN","HN","RESULT","TEST"])
+    st.dataframe(df, use_container_width=True)
+
+    if SHEET_ID and st.button("💾 Save to Google Sheet"):
+        ws = open_sheet(SHEET_ID)
+        before = len(ws.get_all_values())
+        for r in rows:
+            ws.append_row([r["LN"], r["HN"], r["RESULT"], r["TEST"]])
+        after = len(ws.get_all_values())
+        st.success(f"✅ Saved {after - before} rows. Now total rows (incl. header): {after}")
+
+
