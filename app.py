@@ -68,3 +68,33 @@ if files:
         st.success("✅ Saved to Google Sheet!")
 else:
     st.caption("Upload PDF files to start...")
+    SCOPES = [
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/drive.file",
+]
+
+def get_gspread_client():
+    # Streamlit Cloud → อ่านจาก st.secrets
+    # Local/Colab → อ่านจาก service_account.json
+    if "gcp_service_account" in st.secrets:
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(
+            dict(st.secrets["gcp_service_account"]), SCOPES
+        )
+    else:
+        creds = ServiceAccountCredentials.from_json_keyfile_name(
+            "service_account.json", SCOPES
+        )
+    return gspread.authorize(creds)
+
+def open_sheet(sheet_id):
+    gc = get_gspread_client()
+    sh = gc.open_by_key(sheet_id)
+    ws = sh.sheet1
+    if not ws.row_values(1):            # ถ้ายังไม่มี header
+        ws.append_row(["LN","HN","RESULT","TEST"])
+    return ws
+
+ws = open_sheet(SHEET_ID)
+for r in rows:                          # rows คือรายการที่ OCR มาได้
+    ws.append_row([r["LN"], r["HN"], r["RESULT"], r["TEST"]])
+
