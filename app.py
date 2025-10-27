@@ -106,6 +106,15 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# ปุ่มทดสอบ: เขียน 1 แถว + อ่านกลับมาโชว์
+if SHEET_ID and st.button("🧪 Test write & read back"):
+    ws = open_sheet(SHEET_ID)
+    ws.append_row(["TEST-LN", "TEST-HN", "Detected", "COVID-19 (RT-PCR)"])
+    values = ws.get_all_values()
+    st.success(f"Rows in sheet (including header): {len(values)}")
+    st.write("Last 5 rows from Google Sheet:")
+    st.table(values[-5:])
+
 if rows:
     df = pd.DataFrame(rows, columns=["LN","HN","RESULT","TEST"])
     st.dataframe(df, use_container_width=True)
