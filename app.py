@@ -106,25 +106,30 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ปุ่มทดสอบ: เขียน 1 แถว + อ่านกลับมาโชว์
-if SHEET_ID and st.button("🧪 Test write & read back"):
-    ws = open_sheet(SHEET_ID)
-    ws.append_row(["TEST-LN", "TEST-HN", "Detected", "COVID-19 (RT-PCR)"])
-    values = ws.get_all_values()
-    st.success(f"Rows in sheet (including header): {len(values)}")
-    st.write("Last 5 rows from Google Sheet:")
-    st.table(values[-5:])
-
+# แสดงตาราง
 if rows:
-    df = pd.DataFrame(rows, columns=["LN","HN","RESULT","TEST"])
+    df = pd.DataFrame(rows, columns=["LN", "HN", "RESULT", "TEST"])
     st.dataframe(df, use_container_width=True)
 
-    if SHEET_ID and st.button("💾 Save to Google Sheet"):
+    # ปุ่มบันทึก (ใส่ key ให้ unique)
+    if SHEET_ID and st.button("💾 Save to Google Sheet", key="save_btn"):
         ws = open_sheet(SHEET_ID)
         before = len(ws.get_all_values())
         for r in rows:
             ws.append_row([r["LN"], r["HN"], r["RESULT"], r["TEST"]])
         after = len(ws.get_all_values())
         st.success(f"✅ Saved {after - before} rows. Now total rows (incl. header): {after}")
+
+    # ปุ่มทดสอบเขียน/อ่านกลับ (ใส่ key ให้ unique)
+    if SHEET_ID and st.button("🧪 Test write & read back", key="test_btn"):
+        ws = open_sheet(SHEET_ID)
+        ws.append_row(["TEST-LN", "TEST-HN", "Detected", "COVID-19 (RT-PCR)"])
+        values = ws.get_all_values()
+        st.success(f"Rows in sheet (including header): {len(values)}")
+        st.write("Last 5 rows from Google Sheet:")
+        st.table(values[-5:])
+else:
+    st.caption("Upload PDF files to start…")
+
 
 
