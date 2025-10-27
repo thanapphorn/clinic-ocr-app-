@@ -36,7 +36,7 @@ def get_gspread_client():
     return gspread.authorize(creds)
 
 def open_sheet(sheet_id: str):
-    """เปิดชีตและสร้างส่วนหัวถ้ายังไม่มี พร้อมคอลัมน์ Approved Date Time"""
+    """เปิดชีตและสร้างหัวตารางถ้ายังไม่มี (รวม Approved Date Time)"""
     gc = get_gspread_client()
     sh = gc.open_by_key(sheet_id)
     ws = sh.sheet1
@@ -45,23 +45,24 @@ def open_sheet(sheet_id: str):
     if not header:
         ws.append_row(wanted_header)
     elif header != wanted_header:
-        # ปรับหัวตารางให้ตรงรูปแบบ (ถ้าไม่อยากแตะหัวเดิม ให้ลบบรรทัดนี้)
+        # ถ้าอยาก “คงหัวเดิม” ให้ลบบล็อก 3 บรรทัดล่างนี้ออก
         ws.delete_rows(1)
         ws.insert_row(wanted_header, 1)
     return ws
 
 # ---------- OCR Extractors ----------
 def extract_fields(text_raw: str) -> dict:
-    """ดึง LN / HN / RESULT / TEST จากข้อความ PDF"""
+    """ดึง LN / HN / RESULT / TEST / Approved Date Time จากข้อความ PDF"""
+    # รวมบรรทัดเป็นบรรทัดเดียวเพื่อให้ regex ค้นง่าย
     t = re.sub(r"\s+", " ", text_raw.replace("\r", " ").replace("\n", " "))
 
     # LN เช่น: LN: 20251015-001 หรือ LN 20251015
     m_ln = re.search(r"\bLN[:\- ]+([0-9]{6,}(?:-[0-9]{1,4})?)\b", t, re.I)
 
-    # HN เช่น: HN: H00001 หรือ HN H00001
+    # HN เช่น: H00001
     m_hn = re.search(r"\bHN[:\- ]+([A-Z]?\d{4,10})\b", t, re.I)
 
-    # RESULT
+    # RESULT เช่น Detected / Not detected / Positive / Negative / Inconclusive
     m_res = re.search(r"\b(Detected|Not\s*detected|Positive|Negative|Inconclusive)\b", t, re.I)
     if m_res:
         v = m_res.group(1).lower().replace(" ", "")
@@ -74,20 +75,39 @@ def extract_fields(text_raw: str) -> dict:
     else:
         result = "Unknown"
 
+    # Approved Date Time เช่น "Approved Date Time: 16/10/2025 09:26:21"
+    # รองรับทั้งแบบมีวินาที และไม่มีวินาที
+    approved_str = ""
+    m_ap = re.search(
+        r"Approved\s*Date\s*Time[:\- ]+(\d{1,2}/\d{1,2}/\d{4})\s+(\d{1,2}:\d{2}(?::\d{2})?)",
+        t, re.I
+    )
+    if m_ap:
+        raw = f"{m_ap.group(1)} {m_ap.group(2)}"
+        # พยายาม parse 2 รูปแบบ
+        for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M"):
+            try:
+                approved_dt = datetime.strptime(raw, fmt)
+                approved_str = approved_dt.strftime("%d/%m/%Y %H:%M")
+                break
+            except ValueError:
+                continue
+    # ถ้าอยาก fallback เป็นเวลาปัจจุบันของไทย ให้ปลดคอมเมนต์ 2 บรรทัดล่างนี้
+    # else:
+    #     approved_str = datetime.now(timezone(timedelta(hours=7))).strftime("%d/%m/%Y %H:%M")
+
     return {
         "LN": m_ln.group(1) if m_ln else "",
         "HN": m_hn.group(1) if m_hn else "",
         "RESULT": result,
         "TEST": "COVID-19 (RT-PCR)",
+        "Approved Date Time": approved_str,
     }
 
 # ---------- UI ----------
-st.info("Upload PDF → Extract LN, HN, RESULT, TEST → Save to Google Sheet")
+st.info("Upload PDF → Extract LN, HN, RESULT, TEST, Approved Date Time → Save to Google Sheet")
 
 files = st.file_uploader("📎 Upload Lab Reports (PDF)", type=["pdf"], accept_multiple_files=True)
-
-# เวลาไทย (+07)
-TH = timezone(timedelta(hours=7))
 
 # รวมผล OCR
 rows: list[dict] = []
@@ -95,8 +115,7 @@ if files:
     for f in files:
         with pdfplumber.open(io.BytesIO(f.read())) as pdf:
             text = "\n".join([(p.extract_text() or "") for p in pdf.pages])
-        rec = extract_fields(text)
-        rec["Approved Date Time"] = datetime.now(TH).strftime("%d/%m/%Y %H:%M")
+        rec = extract_fields(text)   # ✅ ตอนนี้ Approved Date Time มาจาก PDF แล้ว
         rows.append(rec)
 
 # ลิงก์ไปชีตที่ใช้อยู่
@@ -122,13 +141,7 @@ if rows:
     # ปุ่มทดสอบเขียน/อ่านกลับ
     if SHEET_ID and st.button("🧪 Test write & read back", key="test_btn"):
         ws = open_sheet(SHEET_ID)
-        ws.append_row([
-            "TEST-LN",
-            "TEST-HN",
-            "Detected",
-            "COVID-19 (RT-PCR)",
-            datetime.now(TH).strftime("%d/%m/%Y %H:%M"),
-        ])
+        ws.append_row(["TEST-LN","TEST-HN","Detected","COVID-19 (RT-PCR)","01/01/2025 12:00"])
         values = ws.get_all_values()
         st.success(f"Rows in sheet (including header): {len(values)}")
         st.write("Last 5 rows from Google Sheet:")
