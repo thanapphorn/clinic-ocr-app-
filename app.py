@@ -96,7 +96,7 @@ if files:
         with pdfplumber.open(io.BytesIO(f.read())) as pdf:
             text = "\n".join([(p.extract_text() or "") for p in pdf.pages])
         rec = extract_fields(text)
-        rec["Approved Date Time"] = datetime.now(TH).strftime("%Y-%m-%d %H:%M:%S %z")
+        rec["Approved Date Time"] = datetime.now(TH).strftime("%d/%m/%Y %H:%M")
         rows.append(rec)
 
 # ลิงก์ไปชีตที่ใช้อยู่
@@ -127,7 +127,7 @@ if rows:
             "TEST-HN",
             "Detected",
             "COVID-19 (RT-PCR)",
-            datetime.now(TH).strftime("%Y-%m-%d %H:%M:%S %z"),
+            datetime.now(TH).strftime("%d/%m/%Y %H:%M"),
         ])
         values = ws.get_all_values()
         st.success(f"Rows in sheet (including header): {len(values)}")
